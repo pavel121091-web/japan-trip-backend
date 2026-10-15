@@ -1,1 +1,0 @@
-# japan-trip-backend
