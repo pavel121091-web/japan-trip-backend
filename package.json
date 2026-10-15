@@ -4,9 +4,9 @@
   "description": "Travel backend for Vercel with Gemini and Serper",
   "main": "api/japan-trip.js",
   "dependencies": {
-    "@google/genai": "^0.1.1"
+    "@google/genai": "^2.0.0"
   },
   "engines": {
-    "node": ">=18.x"
+    "node": ">=20.x"
   }
 }
