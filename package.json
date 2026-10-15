@@ -1,0 +1,12 @@
+{
+  "name": "travel-backend",
+  "version": "1.0.0",
+  "description": "Travel backend for Vercel with Gemini and Serper",
+  "main": "api/japan-trip.js",
+  "dependencies": {
+    "@google/genai": "^0.1.1"
+  },
+  "engines": {
+    "node": ">=18.x"
+  }
+}
