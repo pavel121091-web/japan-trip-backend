@@ -1,10 +1,7 @@
 import { GoogleGenAI } from '@google/genai';
 
-// Явно передаем apiKey из переменных окружения Vercel
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-
 export default async function handler(req, res) {
-  // Настройка CORS, чтобы твое мобильное приложение могло стучаться к бэкенду
+  // Настройка CORS для мобильного приложения или HTML-странички
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -14,11 +11,21 @@ export default async function handler(req, res) {
   }
 
   try {
+    const geminiKey = process.env.GEMINI_API_KEY;
+    const serperKey = process.env.SERPER_API_KEY;
+
+    if (!geminiKey || !serperKey) {
+      throw new Error("Не заданы GEMINI_API_KEY или SERPER_API_KEY в переменных окружения Vercel");
+    }
+
+    // Инициализация Gemini
+    const ai = new GoogleGenAI({ apiKey: geminiKey });
+
     // 1. Поиск через Serper.dev
     const serperRes = await fetch('https://google.serper.dev/search', {
       method: 'POST',
       headers: {
-        'X-API-KEY': process.env.SERPER_API_KEY,
+        'X-API-KEY': serperKey,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
@@ -29,9 +36,9 @@ export default async function handler(req, res) {
     });
     const searchData = await serperRes.json();
 
-    // 2. Обработка через Gemini API
+    // 2. Генерация через флагманскую модель gemini-3.1-pro-preview
     const prompt = `
-      Составь подробный план путешествия в Японию на 3 недели.
+      Составь подробный и глубоко проработанный план путешествия в Японию на 3 недели.
       Условия: перелет с пересадкой в Китае, Токио, Киото, пляжный отдых (море), цены на отели.
       
       Верни ответ СТРОГО в формате JSON без каких-либо markdown-оберток (без \`\`\`json), со следующей структурой:
@@ -59,7 +66,7 @@ export default async function handler(req, res) {
     `;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.1-pro-preview',
       contents: prompt,
     });
 
@@ -68,9 +75,9 @@ export default async function handler(req, res) {
     
     const tripData = JSON.parse(rawText);
 
-    return res.status(200).json({ success: v => true, success: true, data: tripData });
+    return res.status(200).json({ success: true, data: tripData });
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ error: error.message });
+    console.error("API Error:", error);
+    return res.status(500).json({ success: false, error: error.message });
   }
 }
