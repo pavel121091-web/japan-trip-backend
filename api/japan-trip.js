@@ -1,7 +1,6 @@
 import { GoogleGenAI } from '@google/genai';
 
 export default async function handler(req, res) {
-  // Настройка CORS для мобильного приложения или HTML-странички
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -18,7 +17,6 @@ export default async function handler(req, res) {
       throw new Error("Не заданы GEMINI_API_KEY или SERPER_API_KEY в переменных окружения Vercel");
     }
 
-    // Инициализация Gemini
     const ai = new GoogleGenAI({ apiKey: geminiKey });
 
     // 1. Поиск через Serper.dev
@@ -36,25 +34,25 @@ export default async function handler(req, res) {
     });
     const searchData = await serperRes.json();
 
-    // 2. Генерация через флагманскую модель gemini-3.1-pro-preview
+    // 2. Генерация через актуальную модель gemini-3.8-flash
     const prompt = `
-      Составь подробный и глубоко проработанный план путешествия в Японию на 3 недели.
+      Составь подробный план путешествия в Японию на 3 недели.
       Условия: перелет с пересадкой в Китае, Токио, Киото, пляжный отдых (море), цены на отели.
       
-      Верни ответ СТРОГО в формате JSON без каких-либо markdown-оберток (без \`\`\`json), со следующей структурой:
+      Верни ответ СТРОГО в формате JSON со следующей структурой:
       {
         "title": "Япония: 3 недели (Китай + Токио + Киото + Море)",
         "flight_info": {
           "route": "Маршрут перелета",
           "estimated_price": "Примерная цена"
         },
-        "days_summary": "Краткое описание",
+        "days_summary": "Краткое описание по неделям",
         "locations": [
           {
             "name": "Название места",
             "category": "city / beach / transit",
-            "description": "Что посмотреть",
-            "hotel_suggestion": "Отель",
+            "description": "Что посмотреть и чем заняться",
+            "hotel_suggestion": "Рекомендуемый отель",
             "price_per_night": "Цена за ночь",
             "lat": 35.6762,
             "lng": 139.6503
@@ -66,14 +64,14 @@ export default async function handler(req, res) {
     `;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.1-pro-preview',
+      model: 'gemini-3.8-flash',
       contents: prompt,
+      config: {
+        responseMimeType: 'application/json'
+      }
     });
 
-    let rawText = response.text.trim();
-    rawText = rawText.replace(/^```json\s*/i, '').replace(/\s*```$/, '');
-    
-    const tripData = JSON.parse(rawText);
+    const tripData = JSON.parse(response.text.trim());
 
     return res.status(200).json({ success: true, data: tripData });
   } catch (error) {
