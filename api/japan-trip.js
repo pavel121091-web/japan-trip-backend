@@ -1,5 +1,6 @@
 import { GoogleGenAI } from '@google/genai';
 
+// Явно передаем apiKey из переменных окружения Vercel
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 export default async function handler(req, res) {
