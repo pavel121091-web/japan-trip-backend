@@ -19,55 +19,67 @@ export default async function handler(req, res) {
 
     const ai = new GoogleGenAI({ apiKey: geminiKey });
 
-    // 1. Поиск через Serper.dev
-    const serperRes = await fetch('https://google.serper.dev/search', {
-      method: 'POST',
-      headers: {
-        'X-API-KEY': serperKey,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        q: 'Япония 3 недели маршрут Токио Киото море отели перелет через Китай',
-        gl: 'ru',
-        hl: 'ru'
-      })
-    });
-    const searchData = await serperRes.json();
+    // 1. Быстрый поиск через Serper (с защитой от зависания в 5 секунд)
+    let searchSnippets = [];
+    try {
+      const serperRes = await fetch('https://google.serper.dev/search', {
+        method: 'POST',
+        headers: {
+          'X-API-KEY': serperKey,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          q: 'Япония маршрут Токио Киото море отели цены перелет через Китай',
+          gl: 'ru',
+          hl: 'ru',
+          num: 4
+        }),
+        signal: AbortSignal.timeout(5000)
+      });
+      const searchData = await serperRes.json();
+      // Берем только заголовки и краткие описания, чтобы не перегружать промпт
+      searchSnippets = (searchData.organic || []).slice(0, 4).map(item => ({
+        title: item.title,
+        snippet: item.snippet
+      }));
+    } catch (serperErr) {
+      console.warn("Serper timeout or error, continuing with Gemini:", serperErr.message);
+    }
 
-    // 2. Генерация через актуальную модель gemini-3.8-flash
+    // 2. Генерация через gemini-3.8-flash без задержки на "размышления"
     const prompt = `
-      Составь подробный план путешествия в Японию на 3 недели.
-      Условия: перелет с пересадкой в Китае, Токио, Киото, пляжный отдых (море), цены на отели.
-      
-      Верни ответ СТРОГО в формате JSON со следующей структурой:
+      Составь план путешествия в Японию на 3 недели (перелет через Китай, Токио, Киото, море).
+      Верни СТРОГО JSON (4 локации в массиве locations: Пекин транзит, Токио, Киото, Окинава или Камакура):
       {
         "title": "Япония: 3 недели (Китай + Токио + Киото + Море)",
         "flight_info": {
-          "route": "Маршрут перелета",
-          "estimated_price": "Примерная цена"
+          "route": "Москва — Пекин — Токио",
+          "estimated_price": "Примерная цена туда-обратно"
         },
-        "days_summary": "Краткое описание по неделям",
+        "days_summary": "Краткая разбивка по дням (1-2 предложения)",
         "locations": [
           {
-            "name": "Название места",
-            "category": "city / beach / transit",
-            "description": "Что посмотреть и чем заняться",
-            "hotel_suggestion": "Рекомендуемый отель",
+            "name": "Город",
+            "category": "transit / city / beach",
+            "description": "Кратко что посмотреть (1-2 предложения)",
+            "hotel_suggestion": "Название отеля",
             "price_per_night": "Цена за ночь",
             "lat": 35.6762,
             "lng": 139.6503
           }
         ]
       }
-
-      Данные из поиска: ${JSON.stringify(searchData.organic?.slice(0, 5) || [])}
+      Контекст из поиска: ${JSON.stringify(searchSnippets)}
     `;
 
     const response = await ai.models.generateContent({
       model: 'gemini-3.8-flash',
       contents: prompt,
       config: {
-        responseMimeType: 'application/json'
+        responseMimeType: 'application/json',
+        thinkingConfig: {
+          thinkingBudget: 0 // Отключает долгие размышления, ускоряя ответ в 5-6 раз
+        }
       }
     });
 
